@@ -264,7 +264,7 @@ const getGeneralSentiment = async (req, res) => {
 // 1. Get All Events
 const getAllEvents = async (req, res) => {
   try {
-    const page = req.query.page || 1;
+    const page = req.params.page || 1;
     const cache = req.query.cache || true;
 
     const url = `https://forexnewsapi.com/api/v1/events?page=${page}&cache=${cache}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
@@ -287,7 +287,7 @@ const getAllEvents = async (req, res) => {
 
 const getEventById = async (req, res) => {
   try {
-    const eventid = req.query.eventid;  
+    const eventid = req.params.eventid;  
     const page = req.query.page || 1;
     const cache = req.query.cache || true;
 

@@ -32,7 +32,7 @@ router.get("/sentimentAnalysis", getSentimentAnalysis);
 router.get("/allCurrencyPairsSentiment", getAllCurrencyPairsSentiment);
 router.get("/generalSentiment", getGeneralSentiment);
 router.get("/allEvents", getAllEvents);
-router.get("/eventById/:id", getEventById);
+router.get("/eventById/:eventid", getEventById);
 router.get("/trendingHeadlines", getTrendingHeadlines);
 router.get("/sundownDigest", getSundownDigest);
 
