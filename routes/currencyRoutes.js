@@ -23,7 +23,7 @@ const {
 router.get("/currencyPairNews", getCurrencyPairNews);
 router.get("/currencyPairNewsMultiple", getCurrencyPairNewsMultiple);
 router.get("/currencyPairNewsInclude", getCurrencyPairNewsInclude); 
-router.get("/rencyPairNcurewsOnly", getCurrencyPairNewsOnly);
+router.get("/curencyPairNewsOnly", getCurrencyPairNewsOnly);
 router.get("/generalForexNews", getGeneralForexNews);
 router.get("/tickersDB", getTickersDB);
 router.get("/allCurrencyPairsNews", getAllCurrencyPairsNews);

@@ -1,4 +1,5 @@
-const axios = require("axios");
+import axios from "axios";
+import { apiConfig } from "../config/api.js"; 
 
 const getCurrencyPairNews = async (req, res) => {
   try {
@@ -6,7 +7,9 @@ const getCurrencyPairNews = async (req, res) => {
     const items = req.query.items || 3;
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1?currencypair=${currencypair}&items=${items}&page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}?currencypair=${currencypair}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -30,7 +33,9 @@ const getCurrencyPairNewsMultiple = async (req, res) => {
     const items = req.query.items || 50;
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1?currencypair=${currencypair}&items=${items}&page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}?currencypair=${currencypair}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -54,7 +59,9 @@ const getCurrencyPairNewsInclude = async (req, res) => {
     const items = req.query.items || 50;
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1?currencypair-include=${currencypairInclude}&items=${items}&page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}?currencypair-include=${currencypairInclude}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -72,14 +79,15 @@ const getCurrencyPairNewsInclude = async (req, res) => {
   }
 };
 
-
 const getCurrencyPairNewsOnly = async (req, res) => {
   try {
     const currencypairOnly = req.query.currencypairOnly || "EUR-USD";
     const items = req.query.items || 50;
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1?currencypair-only=${currencypairOnly}&items=${items}&page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}?currencypair-only=${currencypairOnly}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -102,7 +110,9 @@ const getGeneralForexNews = async (req, res) => {
     const items = req.query.items || 50;
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1/category?section=general&items=${items}&page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/category?section=general&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -120,10 +130,11 @@ const getGeneralForexNews = async (req, res) => {
   }
 };
 
-
 const getTickersDB = async (req, res) => {
   try {
-    const url = `https://forexnewsapi.com/api/v1/account/tickersdbv2?token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/account/tickersdbv2?token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -146,7 +157,9 @@ const getAllCurrencyPairsNews = async (req, res) => {
     const items = req.query.items || 50;
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1/category?section=allcurrencypairs&items=${items}&page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/category?section=allcurrencypairs&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -164,13 +177,14 @@ const getAllCurrencyPairsNews = async (req, res) => {
   }
 };
 
-
 const getTopMentionedCurrencyPairs = async (req, res) => {
   try {
     const date = req.query.date || "last7days";   
-    const cache = req.query.cache || true;        
+    const cache = req.query.cache || true;
 
-    const url = `https://forexnewsapi.com/api/v1/top-mention?date=${date}&cache=${cache}&2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/top-mention?date=${date}&cache=${cache}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -194,7 +208,9 @@ const getSentimentAnalysis = async (req, res) => {
     const date = req.query.date || "last30days";              
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1/stat?currencypair=${currencypair}&date=${date}&page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/stat?currencypair=${currencypair}&date=${date}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -218,7 +234,9 @@ const getAllCurrencyPairsSentiment = async (req, res) => {
     const date = req.query.date || "last30days";    
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1/stat?section=${section}&date=${date}&page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/stat?section=${section}&date=${date}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -243,7 +261,9 @@ const getGeneralSentiment = async (req, res) => {
     const page = req.query.page || 1;
     const cache = req.query.cache || true;         
 
-    const url = `https://forexnewsapi.com/api/v1/stat?section=${section}&date=${date}&page=${page}&cache=${cache}&2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/stat?section=${section}&date=${date}&page=${page}&cache=${cache}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -261,13 +281,14 @@ const getGeneralSentiment = async (req, res) => {
   }
 };
 
-// 1. Get All Events
 const getAllEvents = async (req, res) => {
   try {
     const page = req.params.page || 1;
     const cache = req.query.cache || true;
 
-    const url = `https://forexnewsapi.com/api/v1/events?page=${page}&cache=${cache}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/events?page=${page}&cache=${cache}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -298,7 +319,9 @@ const getEventById = async (req, res) => {
       });
     }
 
-    const url = `https://forexnewsapi.com/api/v1/events?eventid=${eventid}&page=${page}&cache=${cache}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/events?eventid=${eventid}&page=${page}&cache=${cache}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -320,7 +343,9 @@ const getTrendingHeadlines = async (req, res) => {
   try {
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1/trending-headlines?page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/trending-headlines?page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -342,7 +367,9 @@ const getSundownDigest = async (req, res) => {
   try {
     const page = req.query.page || 1;
 
-    const url = `https://forexnewsapi.com/api/v1/sundown-digest?page=${page}&token=2fy7verxsu14efrjwk4gvrthvaunxddcel5dghen`;
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/sundown-digest?page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
@@ -360,8 +387,7 @@ const getSundownDigest = async (req, res) => {
   }
 };
 
-
-module.exports = { 
+export {
   getCurrencyPairNews,
   getCurrencyPairNewsMultiple,
   getCurrencyPairNewsInclude,
@@ -376,5 +402,5 @@ module.exports = {
   getAllEvents,
   getEventById,
   getTrendingHeadlines,
-  getSundownDigest
+  getSundownDigest,
 };
