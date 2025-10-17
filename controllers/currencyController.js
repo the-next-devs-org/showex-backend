@@ -1,5 +1,5 @@
 import axios from "axios";
-import { apiConfig } from "../config/api.js"; 
+import { apiConfig } from "../config/api.js";
 
 const getCurrencyPairNews = async (req, res) => {
   try {
@@ -55,7 +55,8 @@ const getCurrencyPairNewsMultiple = async (req, res) => {
 
 const getCurrencyPairNewsInclude = async (req, res) => {
   try {
-    const currencypairInclude = req.query.currencypairInclude || "EUR-USD,GBP-USD";
+    const currencypairInclude =
+      req.query.currencypairInclude || "EUR-USD,GBP-USD";
     const items = req.query.items || 50;
     const page = req.query.page || 1;
 
@@ -71,7 +72,10 @@ const getCurrencyPairNewsInclude = async (req, res) => {
       data: response.data,
     });
   } catch (error) {
-    console.error("Error fetching currency pair (include) news:", error.message);
+    console.error(
+      "Error fetching currency pair (include) news:",
+      error.message
+    );
     res.status(500).json({
       success: false,
       error: error.message,
@@ -179,7 +183,7 @@ const getAllCurrencyPairsNews = async (req, res) => {
 
 const getTopMentionedCurrencyPairs = async (req, res) => {
   try {
-    const date = req.query.date || "last7days";   
+    const date = req.query.date || "last7days";
     const cache = req.query.cache || true;
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
@@ -194,7 +198,10 @@ const getTopMentionedCurrencyPairs = async (req, res) => {
       data: response.data,
     });
   } catch (error) {
-    console.error("Error fetching Top Mentioned Currency Pairs:", error.message);
+    console.error(
+      "Error fetching Top Mentioned Currency Pairs:",
+      error.message
+    );
     res.status(500).json({
       success: false,
       error: error.message,
@@ -202,36 +209,97 @@ const getTopMentionedCurrencyPairs = async (req, res) => {
   }
 };
 
+// const getSentimentAnalysis = async (req, res) => {
+//   try {
+//     const currencypair = req.query.currencypair || "EUR-USD";
+//     const date = req.query.date || "last30days";
+//     const page = req.query.page || 1;
+
+//     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+//     const url = `${FOREX_API_BASE_URL}/stat?currencypair=${currencypair}&date=${date}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
+
+//     const response = await axios.get(url);
+
+//     console.log("Sentiment Analysis response data:", response.data);
+
+//     res.json({
+//       success: true,
+//       message: "Sentiment Analysis fetched successfully",
+//       data: response.data,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching Sentiment Analysis:", error.message);
+//     res.status(500).json({
+//       success: false,
+//       error: error.message,
+//     });
+//   }
+// };
+
 const getSentimentAnalysis = async (req, res) => {
   try {
-    const currencypair = req.query.currencypair || "EUR-USD"; 
-    const date = req.query.date || "last30days";              
-    const page = req.query.page || 1;
+    const currencypair = req.query.currencypair || "EUR-USD";
+    const date = req.query.date || "last30days";
+    const page = Number(req.query.page) || 1;
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
-    const url = `${FOREX_API_BASE_URL}/stat?currencypair=${currencypair}&date=${date}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
+    const url =
+      `${FOREX_API_BASE_URL}/stat` +
+      `?currencypair=${encodeURIComponent(currencypair)}` +
+      `&date=${encodeURIComponent(date)}` +
+      `&page=${page}` +
+      `&token=${encodeURIComponent(FOREX_API_token_BASE_URL)}`;
 
     const response = await axios.get(url);
+    const payload = response.data || {};
 
-    res.json({
+    // Convert totals object -> array: [{ pair, ...totals }]
+    const totals = Object.entries(payload.total || {}).map(
+      ([pair, totalsObj]) => ({
+        pair,
+        ...(totalsObj || {}),
+      })
+    );
+
+    // Convert nested date->pair->metrics -> flat array of rows
+    // [{ date, pair, ...metrics }]
+    const rows = Object.entries(payload.data || {}).flatMap(
+      ([dateKey, pairObj]) =>
+        Object.entries(pairObj || {}).map(([pair, metrics]) => ({
+          date: dateKey,
+          pair,
+          ...(metrics || {}),
+        }))
+    );
+
+    // If you want the response body to be JUST an array, you can send `rows` directly:
+    // return res.json(rows);
+
+    // Keeping your wrapper but ensuring arrays:
+    return res.json({
       success: true,
       message: "Sentiment Analysis fetched successfully",
-      data: response.data,
+      total_pages: payload.total_pages ?? null,
+      totals, // array
+      data: rows, // array
     });
   } catch (error) {
-    console.error("Error fetching Sentiment Analysis:", error.message);
-    res.status(500).json({
+    console.error("Error fetching Sentiment Analysis:", error?.message);
+    const status = error?.response?.status || 500;
+    return res.status(status).json({
       success: false,
-      error: error.message,
+      error: error?.message || "Unknown error",
+      details: error?.response?.data ?? null,
     });
   }
 };
 
 const getAllCurrencyPairsSentiment = async (req, res) => {
   try {
-    const section = "allcurrencypairs";             
-    const date = req.query.date || "last30days";    
+    const section = "allcurrencypairs";
+    const date = req.query.date || "last30days";
     const page = req.query.page || 1;
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
@@ -246,7 +314,10 @@ const getAllCurrencyPairsSentiment = async (req, res) => {
       data: response.data,
     });
   } catch (error) {
-    console.error("Error fetching All Currency Pairs Sentiment Analysis:", error.message);
+    console.error(
+      "Error fetching All Currency Pairs Sentiment Analysis:",
+      error.message
+    );
     res.status(500).json({
       success: false,
       error: error.message,
@@ -256,10 +327,10 @@ const getAllCurrencyPairsSentiment = async (req, res) => {
 
 const getGeneralSentiment = async (req, res) => {
   try {
-    const section = "general";                     
-    const date = req.query.date || "last30days";   
+    const section = "general";
+    const date = req.query.date || "last30days";
     const page = req.query.page || 1;
-    const cache = req.query.cache || true;         
+    const cache = req.query.cache || true;
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
@@ -273,7 +344,10 @@ const getGeneralSentiment = async (req, res) => {
       data: response.data,
     });
   } catch (error) {
-    console.error("Error fetching General Forex Sentiment Analysis:", error.message);
+    console.error(
+      "Error fetching General Forex Sentiment Analysis:",
+      error.message
+    );
     res.status(500).json({
       success: false,
       error: error.message,
@@ -308,7 +382,7 @@ const getAllEvents = async (req, res) => {
 
 const getEventById = async (req, res) => {
   try {
-    const eventid = req.params.eventid;  
+    const eventid = req.params.eventid;
     const page = req.query.page || 1;
     const cache = req.query.cache || true;
 
