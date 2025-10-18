@@ -137,6 +137,34 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
+const updateProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstname, lastname, country, username, emailaddress } = req.body;
+
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.firstname = firstname || user.firstname;
+    user.lastname = lastname || user.lastname;
+    user.country = country || user.country;
+    user.username = username || user.username;
+    user.emailaddress = emailaddress || user.emailaddress;
+
+    await user.save();
+
+    res.json({
+      message: "✅ Profile updated successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("❌ Error updating profile:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -221,6 +249,34 @@ const totalUserCount = async (req, res) => {
   }
 };
 
+const changePassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current and new passwords are required" });
+    }
+
+    const user = await User.findByPk(id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Current password is incorrect" });
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+
+    await user.save();
+
+    res.json({ message: "✅ Password updated successfully" });
+  } catch (error) {
+    console.error("❌ Error updating password:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 
 
 
@@ -233,5 +289,7 @@ module.exports = {
   getUserProfile,
   deleteUser,
   updateUserWithPassword,
-  totalUserCount
+  totalUserCount,
+  changePassword,
+  updateProfile
 };
