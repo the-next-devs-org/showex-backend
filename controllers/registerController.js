@@ -114,16 +114,18 @@ const getUserProfile = async (req, res) => {
 const updateUserProfile = async (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, country } = req.body;
+    const updates = req.body;
 
     const user = await User.findByPk(id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.firstname = firstName || user.firstname;
-    user.lastname = lastName || user.lastname;
-    user.country = country || user.country;
+    Object.keys(updates).forEach(key => {
+      if (user[key] !== undefined) {
+        user[key] = updates[key];
+      }
+    });
 
     await user.save();
 
