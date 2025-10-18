@@ -66,7 +66,8 @@ const loginUser = async (req, res) => {
       lastname: user.lastname,
       emailaddress: user.emailaddress,
       username: user.username,
-      country: user.country
+      country: user.country,
+      role: user.role
     };
 
     res.json({ message: "Login successful", token, user: userSafe });
