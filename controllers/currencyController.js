@@ -461,6 +461,94 @@ const getSundownDigest = async (req, res) => {
   }
 };
 
+const getCategory = async (req, res) => {
+  try {
+    const section = req.query.section || "general";
+    const items = req.query.items || 10;
+    const page = req.query.page || 1;
+
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/category?section=${section}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
+
+    const response = await axios.get(url);
+
+    res.json({
+      success: true,
+      message: `Category (${section}) news fetched successfully`,
+      data: response.data,
+    });
+  } catch (error) {
+    console.error("Error fetching category news:", error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+const getNewsById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = req.query.page || 1;
+
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/trending-headlines?page=${page}&token=${FOREX_API_token_BASE_URL}`;
+    const response = await axios.get(url);
+
+    const data = response?.data?.data;
+
+    const newsItem = data?.find((item) => item.id === Number(id));
+
+    if (!newsItem) {
+      return res
+        .status(404)
+        .json({ success: false, message: "News not found for given ID" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `News with ID ${id} fetched successfully`,
+      data: newsItem,
+    });
+  } catch (error) {
+    console.error("Error fetching news by ID:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+
+ const getAllTrendingHeadlines = async (req, res) => {
+  try {
+    const page = req.query.page || 1;
+
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url = `${FOREX_API_BASE_URL}/trending-headlines?page=${page}&token=${FOREX_API_token_BASE_URL}`;
+
+    const response = await axios.get(url);
+
+    res.status(200).json({
+      success: true,
+      message: "All trending headlines fetched successfully",
+      data: response.data,
+    });
+  } catch (error) {
+    console.error("Error fetching all trending headlines:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch trending headlines",
+      error: error.message,
+    });
+  }
+};
+
+
 export {
   getCurrencyPairNews,
   getCurrencyPairNewsMultiple,
@@ -477,4 +565,7 @@ export {
   getEventById,
   getTrendingHeadlines,
   getSundownDigest,
+  getCategory,
+  getNewsById,
+  getAllTrendingHeadlines,
 };

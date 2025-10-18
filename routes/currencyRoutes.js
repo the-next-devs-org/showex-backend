@@ -2,10 +2,10 @@ const express = require("express");
 const router = express.Router();
 
 const { 
-   getCurrencyPairNews,
-   getCurrencyPairNewsMultiple , 
-   getCurrencyPairNewsInclude,
-   getCurrencyPairNewsOnly, 
+    getCurrencyPairNews,
+    getCurrencyPairNewsMultiple , 
+    getCurrencyPairNewsInclude,
+    getCurrencyPairNewsOnly, 
     getGeneralForexNews,
     getTickersDB,
     getAllCurrencyPairsNews,
@@ -16,7 +16,10 @@ const {
     getAllEvents,
     getEventById,
     getTrendingHeadlines,
-    getSundownDigest
+    getSundownDigest,
+    getCategory,
+    getNewsById,
+    getAllTrendingHeadlines
     
 } = require("../controllers/currencyController");
 
@@ -35,6 +38,9 @@ router.get("/allEvents", getAllEvents);
 router.get("/eventById/:eventid", getEventById);
 router.get("/trendingHeadlines", getTrendingHeadlines);
 router.get("/sundownDigest", getSundownDigest);
+router.get("/category", getCategory);
+router.get("/trending-headlines/:id", getNewsById);
+router.get("/trending-headlines", getAllTrendingHeadlines);
 
 
 module.exports = router;
