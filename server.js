@@ -11,6 +11,7 @@ const fredSourcesRoutes = require("./routes/fredSourcesRoutes");
 const fredTagsRoutes = require("./routes/fredTagsRoutes");
 const predictionRoutes = require("./routes/predictionRoutes");
 const indicatorRoutes = require('./routes/indicatorRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 app.use(express.json());
@@ -38,6 +39,8 @@ app.use("/api", registerRoute);
 app.use("/api", currencyRoutes);
 app.use("/api/predictions", predictionRoutes);
 app.use('/api/indicators', indicatorRoutes);
+app.use('/api/notications', notificationRoutes);
+
 
 app.get("/", (req, res) => res.send("API is running"));
 

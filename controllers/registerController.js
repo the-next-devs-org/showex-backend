@@ -87,8 +87,60 @@ const getUsers = async (req, res) => {
   }
 };
 
+const getUserProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findByPk(id, {
+      attributes: ["id", "firstname", "lastname", "emailaddress", "country"],
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      message: "✅ User profile fetched successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching user profile:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+const updateUserProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstName, lastName, country } = req.body;
+
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.firstname = firstName || user.firstname;
+    user.lastname = lastName || user.lastname;
+    user.country = country || user.country;
+
+    await user.save();
+
+    res.json({
+      message: "✅ Profile updated successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("❌ Error updating profile:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 module.exports = {
   registerUser,
   loginUser,
-  getUsers
+  getUsers,
+  updateUserProfile,
+  getUserProfile
 };
