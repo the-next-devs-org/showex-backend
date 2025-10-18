@@ -136,11 +136,101 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "❌ User not found" });
+    }
+
+    await user.destroy();
+
+    res.json({
+      message: "✅ User deleted successfully",
+      deletedUserId: id
+    });
+  } catch (error) {
+    console.error("❌ Error deleting user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const updateUserWithPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstname, lastname, username, emailaddress, password, country } = req.body;
+
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "❌ User not found" });
+    }
+
+    if (username && username !== user.username) {
+      const existingUsername = await User.findOne({ where: { username } });
+      if (existingUsername && existingUsername.id !== user.id) {
+        return res.status(409).json({ message: "Username already taken" });
+      }
+    }
+
+    if (emailaddress && emailaddress !== user.emailaddress) {
+      const existingEmail = await User.findOne({ where: { emailaddress } });
+      if (existingEmail && existingEmail.id !== user.id) {
+        return res.status(409).json({ message: "Email already registered" });
+      }
+    }
+
+    user.firstname = firstname || user.firstname;
+    user.lastname = lastname || user.lastname;
+    user.username = username || user.username;
+    user.emailaddress = emailaddress || user.emailaddress;
+    user.country = country || user.country;
+
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      user.password = hashedPassword;
+    }
+
+    await user.save();
+
+    const updatedUser = user.toJSON();
+    delete updatedUser.password; 
+
+    res.json({
+      message: "✅ User updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("❌ Error updating user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const totalUserCount = async (req, res) => {
+  try {
+    const totalUsers = await User.count();
+
+    res.json({
+      totalUsers
+    });
+  } catch (error) {
+    console.error("❌ Error fetching total users:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+
 
 module.exports = {
   registerUser,
   loginUser,
   getUsers,
   updateUserProfile,
-  getUserProfile
+  getUserProfile,
+  deleteUser,
+  updateUserWithPassword,
+  totalUserCount
 };

@@ -28,6 +28,14 @@ const Register = sequelize.define('User', {
   country: {
     type: DataTypes.STRING,
     allowNull: false
+  },
+  role: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    validate: {
+      isIn: [[0, 1]]
+    }
   }
 }, {
   freezeTableName: true,
