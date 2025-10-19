@@ -1,20 +1,22 @@
-// backend/utils/translateHelper.js
-import { v2 as Translate } from "@google-cloud/translate";
-import path from "path";
+import axios from "axios";
+import dotenv from "dotenv";
 
-const keyFile = path.join(process.cwd(), "config", "google-translate-key.json");
-
-const translate = new Translate.Translate({
-  keyFilename: keyFile,
-});
+dotenv.config();
 
 export const translateText = async (text, targetLang) => {
-  if (!text || !targetLang) return text;
   try {
-    const [translation] = await translate.translate(text, targetLang);
-    return translation;
-  } catch (error) {
-    console.error("Translation error:", error.message);
-    return text; 
+    const apiKey = 'AIzaSyDjT0-ylLF5QPY0Gms7XwhtgxRM31PHQu0';
+    const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
+
+    const response = await axios.post(url, {
+      q: text,
+      target: targetLang,
+      format: "text",
+    });
+
+    return response.data.data.translations[0].translatedText;
+  } catch (err) {
+    console.error("Translation error:", err.message);
+    return text;
   }
 };
