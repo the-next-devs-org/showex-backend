@@ -5,7 +5,7 @@ dotenv.config();
 
 export const translateText = async (text, targetLang) => {
   try {
-    const apiKey = 'AIzaSyDjT0-ylLF5QPY0Gms7XwhtgxRM31PHQu0';
+    const apiKey = 'AIzaSyBYYQnqg8DxOQWU_9KbwouHstJKyHSDCKA';
     const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
 
     const response = await axios.post(url, {

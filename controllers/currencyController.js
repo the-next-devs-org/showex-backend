@@ -1,6 +1,6 @@
 import axios from "axios";
 import { apiConfig } from "../config/api.js";
-import { translateText } from "../utils/translateHelper.js"; 
+import { translateText } from "../utils/translateHelper.js";
 
 import Register from "../Model/registerModel.js";
 import Notification from "../Model/Notification.js";
@@ -22,7 +22,7 @@ const getCurrencyPairNews = async (req, res) => {
     const currencypair = req.query.currencypair || "EUR-USD";
     const items = req.query.items || 3;
     const page = req.query.page || 1;
-    const lang = req.query.lang || "en"; 
+    const lang = req.query.lang || "en";
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
     const url = `${FOREX_API_BASE_URL}?currencypair=${currencypair}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
@@ -679,7 +679,7 @@ const getEventById = async (req, res) => {
 const getTrendingHeadlines = async (req, res) => {
   try {
     const page = req.query.page || 1;
-    const lang = req.query.lang || "en"; 
+    const lang = req.query.lang || "en";
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
@@ -755,17 +755,58 @@ const getTrendingHeadlines = async (req, res) => {
 const getSundownDigest = async (req, res) => {
   try {
     const page = req.query.page || 1;
+    const lang = req.query.lang || "en"; // translation ke liye add kiya
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
-
     const url = `${FOREX_API_BASE_URL}/sundown-digest?page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
+    let data = response.data;
+
+    // normalize array
+    if (data && data.data && Array.isArray(data.data)) {
+      data = data.data;
+    } else if (Array.isArray(data)) {
+      data = data;
+    } else {
+      data = [];
+    }
+
+    // translate if language is not English
+    if (lang !== "en" && Array.isArray(data)) {
+      const translatedData = await Promise.all(
+        data.map(async (item) => {
+          const title = item.title || "";
+          const description = item.description || "";
+          const text = item.text || "";
+          const headline = item.headline || "";
+
+          const [tHeadline, tTitle, tDescription, tText] = await Promise.all([
+            headline ? translateText(headline, lang) : headline,
+            title ? translateText(title, lang) : title,
+            description ? translateText(description, lang) : description,
+            text ? translateText(text, lang) : text,
+          ]);
+
+          return {
+            ...item,
+            headline: tHeadline,
+            title: tTitle,
+            description: tDescription,
+            text: tText,
+          };
+        })
+      );
+
+
+      data = translatedData;
+    }
+
     res.json({
       success: true,
       message: "Sundown Digest fetched successfully",
-      data: response.data,
+      data,
     });
   } catch (error) {
     console.error("Error fetching Sundown Digest:", error.message);
@@ -775,6 +816,7 @@ const getSundownDigest = async (req, res) => {
     });
   }
 };
+
 
 const getCategory = async (req, res) => {
   try {
@@ -972,7 +1014,7 @@ const getNegativeSentimentAndNotify = async (req, res) => {
     if (negativeNews.length > 0) {
       // 3. Get all users from database
       const users = await Register.findAll({
-        attributes: ['id', 'emailaddress', 'username','firstname','lastname']
+        attributes: ['id', 'emailaddress', 'username', 'firstname', 'lastname']
       });
 
       // 4. Create notifications and send emails for each user
