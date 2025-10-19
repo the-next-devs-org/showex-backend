@@ -1,22 +1,60 @@
 import axios from "axios";
 import { apiConfig } from "../config/api.js";
+import { translateText } from "../utils/translateHelper.js";
+
+// const getCurrencyPairNews = async (req, res) => {
+//   try {
+//     const currencypair = req.query.currencypair || "EUR-USD";
+//     const items = req.query.items || 3;
+//     const page = req.query.page || 1;
+
+//     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+//     const url = `${FOREX_API_BASE_URL}?currencypair=${currencypair}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
+
+//     const response = await axios.get(url);
+
+//     res.json({
+//       success: true,
+//       message: "Currency pair news fetched successfully",
+//       data: response.data,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching currency pair news:", error.message);
+//     res.status(500).json({
+//       success: false,
+//       error: error.message,
+//     });
+//   }
+// };
 
 const getCurrencyPairNews = async (req, res) => {
+  console.log("getCurrencyPairNews called with query:");
   try {
     const currencypair = req.query.currencypair || "EUR-USD";
     const items = req.query.items || 3;
     const page = req.query.page || 1;
+    const lang = "ru"; // 👈 get language from frontend
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
-
     const url = `${FOREX_API_BASE_URL}?currencypair=${currencypair}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
+    const newsData = response.data?.data || [];
+
+    // 👇 Translate news titles & descriptions
+    const translatedNews = await Promise.all(
+      newsData.map(async (item) => ({
+        ...item,
+        title: await translateText(item.title, lang),
+        description: await translateText(item.description, lang),
+      }))
+    );
 
     res.json({
       success: true,
       message: "Currency pair news fetched successfully",
-      data: response.data,
+      data: translatedNews,
     });
   } catch (error) {
     console.error("Error fetching currency pair news:", error.message);
