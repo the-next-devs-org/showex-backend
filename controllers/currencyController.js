@@ -2,9 +2,19 @@ import axios from "axios";
 import { apiConfig } from "../config/api.js";
 import { translateText } from "../utils/translateHelper.js"; 
 
+import Register from "../Model/registerModel.js";
+import Notification from "../Model/Notification.js";
+import nodemailer from "nodemailer";
 
-
-
+const transporter = nodemailer.createTransport({
+  host: 'smtp.mailersend.net',
+  port: 587,
+  secure: false,
+  auth: {
+    user: 'MS_RV276m@test-ywj2lpn1dwqg7oqz.mlsender.net',
+    pass: 'mssp.i0pAJ9H.pq3enl69o68l2vwr.vYDLDnA'
+  }
+});
 
 
 const getCurrencyPairNews = async (req, res) => {
@@ -936,6 +946,103 @@ const getAllTrendingHeadlines = async (req, res) => {
 };
 
 
+const getNegativeSentimentAndNotify = async (req, res) => {
+  try {
+    // Default values for cron job or direct function call
+    let section = "allcurrencypairs";
+    let items = 50;
+    let page = 1;
+
+    // If called as an API endpoint, use query parameters
+    if (req && req.query) {
+      section = req.query.section || "allcurrencypairs";
+      items = req.query.items || 50;
+      page = req.query.page || 1;
+    }
+
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    // 1. Get news from API
+    const url = `${FOREX_API_BASE_URL}/category?section=${section}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
+    const response = await axios.get(url);
+
+    // 2. Filter negative sentiment news
+    const negativeNews = response.data.data.filter(item => item.sentiment === "Negative");
+
+    if (negativeNews.length > 0) {
+      // 3. Get all users from database
+      const users = await Register.findAll({
+        attributes: ['id', 'emailaddress', 'username','firstname','lastname']
+      });
+
+      // 4. Create notifications and send emails for each user
+      for (const user of users) {
+        // Create HTML content for email
+        const emailContent = negativeNews.map(news => `
+          <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
+            <h3 style="color: #d32f2f;">Alert for ${news.currency.join(", ")}</h3>
+            <p><strong>Title:</strong> ${news.title}</p>
+            <p><strong>Details:</strong> ${news.text}</p>
+            <p><strong>Sentiment:</strong> Negative</p>
+            <p><strong>Source:</strong> ${news.source_name}</p>
+            <p><strong>Date:</strong> ${news.date}</p>
+            <a href="${news.news_url}" style="background-color: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Read More</a>
+          </div>
+        `).join('');
+
+        // Send email
+        await transporter.sendMail({
+          from: 'MS_RV276m@test-ywj2lpn1dwqg7oqz.mlsender.net',
+          to: user.emailaddress,
+          subject: "⚠️ Negative Currency Alert - ShowEx",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #d32f2f;">Important Currency Alert</h2>
+              <p>Dear ${user.firstname} ${user.lastname},</p>
+              <p>We've detected negative sentiment for some currency pairs you might be interested in:</p>
+              ${emailContent}
+              <p style="margin-top: 20px;">Stay informed and trade wisely!</p>
+              <p>Best regards,<br>ShowEx Team</p>
+            </div>
+          `
+        });
+
+        // Create more concise notification record
+        const conciseNotification = {
+          title: "Negative Currency Alerts",
+          alerts: negativeNews.map(news => ({
+            pair: news.currency[0],
+            title: news.title.substring(0, 100) // Limit title length
+          }))
+        };
+
+        // await Notification.create({
+        //   user_id: user.id,
+        //   notification: JSON.stringify(conciseNotification).substring(0, 900), // Ensure we stay under 1000 char limit
+        //   currencies: JSON.stringify(negativeNews.slice(0, 5).flatMap(news => news.currency)) // Limit to first 5 currencies
+        // });
+      }
+    }
+
+    res.json({
+      success: true,
+
+      message: "Negative sentiment news processed and notifications sent",
+      data: {
+        negativeNews,
+        notificationCount: negativeNews.length
+      }
+    });
+
+  } catch (error) {
+    console.error("Error in getNegativeSentimentAndNotify:", error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
 
 export {
   getCurrencyPairNews,
@@ -956,4 +1063,5 @@ export {
   getCategory,
   getNewsById,
   getAllTrendingHeadlines,
+  getNegativeSentimentAndNotify,
 };

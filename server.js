@@ -13,6 +13,9 @@ const predictionRoutes = require("./routes/predictionRoutes");
 const indicatorRoutes = require('./routes/indicatorRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
+const cron = require('node-cron');
+const { getNegativeSentimentAndNotify } = require('./controllers/currencyController');
+
 const app = express();
 app.use(express.json());
 
@@ -45,6 +48,26 @@ app.use('/api/notications', notificationRoutes);
 app.get("/", (req, res) => res.send("API is running"));
 
 const PORT = process.env.PORT;
+
+cron.schedule('*/15 * * * *', async () => {
+  console.log('Cron job running at', new Date());
+  try {
+    // Pass empty objects as req and res since it's not a real HTTP request
+    await getNegativeSentimentAndNotify({
+      query: {
+        section: "allcurrencypairs",
+        items: 50,
+        page: 1
+      }
+    }, {
+      json: () => {},
+      status: () => ({ json: () => {} })
+    });
+    console.log('✅ getNegativeSentimentAndNotify executed successfully');
+  } catch (err) {
+    console.error('❌ Error executing function:', err.message);
+  }
+});
 
 (async () => {
   try {

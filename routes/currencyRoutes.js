@@ -19,7 +19,8 @@ const {
     getSundownDigest,
     getCategory,
     getNewsById,
-    getAllTrendingHeadlines
+    getAllTrendingHeadlines,
+    getNegativeSentimentAndNotify
     
 } = require("../controllers/currencyController");
 
@@ -41,6 +42,7 @@ router.get("/sundownDigest", getSundownDigest);
 router.get("/category", getCategory);
 router.get("/trending-headlines/:id", getNewsById);
 router.get("/trending-headlines", getAllTrendingHeadlines);
+router.get("/getNegativeSentimentAndNotify", getNegativeSentimentAndNotify);
 
 
 module.exports = router;
