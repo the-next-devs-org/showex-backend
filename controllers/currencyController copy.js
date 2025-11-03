@@ -5,70 +5,50 @@ import { translateText } from "../utils/translateHelper.js";
 import Register from "../Model/registerModel.js";
 import Notification from "../Model/Notification.js";
 import nodemailer from "nodemailer";
-// import { createClient } from "redis";
-import trackApiCall from '../utils/trackApiCall.js';
-import getGeneralForexNewss from '../Model/getGeneralForexNews.js';
-import getSundownDigestt from '../Model/getSundownDigest.js';
-import getTrendingHeadliness from '../Model/getTrendingHeadlines.js';
-import getCurrencyPairNewsIncludee from '../Model/getCurrencyPairNewsInclude.js';
-import getSentimentAnalysiss from '../Model/getSentimentAnalysis.js';
-import getAllEventss from '../Model/getAllEvents.js';
-import getCategoryAllCurrencyPairss from '../Model/getCategoryAllCurrencyPairs.js';
-
+import { createClient } from "redis";
 
 // Create Redis client instance
-// let redisClient;
+let redisClient;
 
-// const initRedis = async () => {
-//   try {
-//     redisClient = createClient({
-//       url: 'redis://127.0.0.1:6379',
-//       socket: {
-//         host: '127.0.0.1',
-//         port: 6379,
-//         connectTimeout: 2000,
-//         timeout: 2000,
-//         reconnectStrategy: (retries) => {
-//           if (retries > 2) return new Error('Redis connection failed');
-//           return Math.min(retries * 100, 500);
-//         }
-//       }
-//     });
+const initRedis = async () => {
+  redisClient = createClient({
+    url: 'redis://127.0.0.1:6379',
+    socket: {
+      host: '127.0.0.1',
+      port: 6379,
+      connectTimeout: 5000,
+      timeout: 5000,
+      reconnectStrategy: (retries) => {
+        if (retries > 3) return new Error('Redis connection failed');
+        return Math.min(retries * 100, 1000);
+      }
+    }
+  });
 
-//     // Handle Redis connection events
-//     redisClient.on('connect', () => console.log('Redis Client connecting...'));
-//     redisClient.on('ready', () => console.log('Redis Client connected successfully'));
-//     redisClient.on('error', (err) => console.log('Redis unavailable:', err.message));
-//     redisClient.on('end', () => console.log('Redis disconnected, using memory cache'));
+  // Handle Redis connection events
+  redisClient.on('connect', () => console.log('Redis Client connecting...'));
+  redisClient.on('ready', () => console.log('Redis Client connected successfully'));
+  redisClient.on('error', (err) => console.log('Redis Client Error:', err));
+  redisClient.on('end', () => console.log('Redis Client disconnected'));
 
-//     await redisClient.connect();
-//   } catch (err) {
-//     console.log('Redis unavailable, using memory cache');
-//     // Create in-memory cache as fallback
-//     const memoryCache = new Map();
-//     redisClient = {
-//       get: async (key) => {
-//         const item = memoryCache.get(key);
-//         if (item && item.expiry > Date.now()) {
-//           return item.value;
-//         }
-//         memoryCache.delete(key);
-//         return null;
-//       },
-//       setEx: async (key, ttl, value) => {
-//         memoryCache.set(key, {
-//           value,
-//           expiry: Date.now() + (ttl * 1000)
-//         });
-//       },
-//       connect: async () => {},
-//       on: () => {}
-//     };
-//   }
-// };
+  try {
+    await redisClient.connect();
+  } catch (err) {
+    console.error('Redis connection error:', err);
+    // Fallback to in-memory cache if Redis fails
+    const cache = new Map();
+    redisClient = {
+      get: async (key) => cache.get(key),
+      setEx: async (key, ttl, value) => {
+        cache.set(key, value);
+        setTimeout(() => cache.delete(key), ttl * 1000);
+      }
+    };
+  }
+};
 
 // Initialize Redis
-// initRedis();
+initRedis();
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.mailersend.net',
@@ -91,27 +71,21 @@ const getCurrencyPairNews = async (req, res) => {
     // Create cache key
     const cacheKey = `currencyPairNews:${currencypair}:${items}:${page}:${lang}`;
     
-    // try {
-    //   // Try to get from cache first
-    //   const cachedData = await redisClient.get(cacheKey);
-    //   if (cachedData) {
-    //     return res.json({
-    //       success: true,
-    //       message: "Currency pair news fetched successfully (cache)",
-    //       data: JSON.parse(cachedData)
-    //     });
-    //   }
-    // } catch (redisError) {
-    //   // Silently continue to API call if Redis fails
-    // }
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      console.log("Returning cached currency pair news");
+      return res.json({
+        success: true,
+        message: "Currency pair news fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
     const url = `${FOREX_API_BASE_URL}?currencypair=${currencypair}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
-
-    await trackApiCall('getCurrencyPairNews');
-    console.log('Tracked API call: getCurrencyPairNews');
 
     let data = response.data;
 
@@ -150,12 +124,8 @@ const getCurrencyPairNews = async (req, res) => {
       data = translatedData;
     }
 
-    // try {
-    //   // Try to save to Redis cache
-    //   await redisClient.setEx(cacheKey, 300, JSON.stringify(data));
-    // } catch (redisError) {
-    //   // Silently continue if Redis save fails
-    // }
+    // Save to Redis with 150 sec expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(data));
 
     res.json({
       success: true,
@@ -170,6 +140,31 @@ const getCurrencyPairNews = async (req, res) => {
     });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // const getCurrencyPairNews = async (req, res) => {
 //   try {
@@ -243,19 +238,15 @@ const getCurrencyPairNewsMultiple = async (req, res) => {
     // Create cache key
     const cacheKey = `currencyPairNewsMultiple:${currencypair}:${items}:${page}`;
     
-    // try {
-    //   // Try to get from cache first
-    //   const cachedData = await redisClient.get(cacheKey);
-    //   if (cachedData) {
-    //     return res.json({
-    //       success: true,
-    //       message: "Currency pair news (multiple) fetched successfully (cache)",
-    //       data: JSON.parse(cachedData)
-    //     });
-    //   }
-    // } catch (redisError) {
-    //   // Silently continue to API call if Redis fails
-    // }
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "Currency pair news (multiple) fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
@@ -263,14 +254,8 @@ const getCurrencyPairNewsMultiple = async (req, res) => {
 
     const response = await axios.get(url);
 
-    await trackApiCall('getCurrencyPairNewsMultiple');
-
-    // try {
-    //   // Try to save to Redis cache
-    //   await redisClient.setEx(cacheKey, 300, JSON.stringify(response.data));
-    // } catch (redisError) {
-    //   // Silently continue if Redis save fails
-    // }
+    // Save to Redis with 150 sec expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(response.data));
 
     res.json({
       success: true,
@@ -286,95 +271,39 @@ const getCurrencyPairNewsMultiple = async (req, res) => {
   }
 };
 
-// const getCurrencyPairNewsInclude = async (req, res) => {
-//   try {
-//     const currencypairInclude =
-//       req.query.currencypairInclude || "EUR-USD,GBP-USD";
-//     const items = req.query.items || 50;
-//     const page = req.query.page || 1;
-//     const lang = req.query.lang || "en"; // 🔹 language param
-
-//     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
-
-//     const url = `${FOREX_API_BASE_URL}?currencypair-include=${currencypairInclude}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
-
-//     const response = await axios.get(url);
-
-//     await trackApiCall('getCurrencyPairNewsInclude');
-
-//     const newsData = response?.data?.data || [];
-
-//     let translatedData = newsData;
-
-//     // 🔹 Only translate if lang ≠ "en"
-//     if (lang !== "en" && newsData.length > 0) {
-//       translatedData = await Promise.all(
-//         newsData.map(async (item) => {
-//           const title = item.title || "";
-//           const text = item.text || "";
-
-//           const [tTitle, tText] = await Promise.all([
-//             title ? translateText(title, lang) : title,
-//             text ? translateText(text, lang) : text,
-//           ]);
-
-//           return {
-//             ...item,
-//             title: tTitle,
-//             text: tText,
-//           };
-//         })
-//       );
-//     }
-
-//     const responseData = {
-//       ...response.data,
-//       data: translatedData
-//     };
-
-//     res.json({
-//       success: true,
-//       message: "Currency pair (include) news fetched successfully",
-//       data: responseData,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching currency pair (include) news:", error.message);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch currency pair (include) news",
-//       error: error.message,
-//     });
-//   }
-// };
-
 const getCurrencyPairNewsInclude = async (req, res) => {
   try {
-    const lang = req.query.lang || "en";
+    const currencypairInclude =
+      req.query.currencypairInclude || "EUR-USD,GBP-USD";
+    const items = req.query.items || 50;
+    const page = req.query.page || 1;
+    const lang = req.query.lang || "en"; // 🔹 language param
 
-    let latestRow = await getCurrencyPairNewsIncludee.findOne();
-    // Normalize api_response: some DB rows store JSON as string
-    const normalizeApiResponse = (resp) => {
-      if (!resp) return resp;
-      if (typeof resp === 'string') {
-        try {
-          return JSON.parse(resp);
-        } catch (err) {
-          // try to remove BOM or stray characters then parse
-          try {
-            return JSON.parse(resp.replace(/^[\uFEFF\u200B]+/, ''));
-          } catch (err2) {
-            return resp; // fallback: return original string
-          }
-        }
-      }
-      return resp;
-    };
+    // Create cache key
+    const cacheKey = `currencyPairNewsInclude:${currencypairInclude}:${items}:${page}:${lang}`;
+    
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "Currency pair (include) news fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
-    let newsData = latestRow ? normalizeApiResponse(latestRow.api_response) : [];
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
-    // Translate if lang ≠ "en"
+    const url = `${FOREX_API_BASE_URL}?currencypair-include=${currencypairInclude}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
+
+    const response = await axios.get(url);
+    const newsData = response?.data?.data || [];
+
+    let translatedData = newsData;
+
+    // 🔹 Only translate if lang ≠ "en"
     if (lang !== "en" && newsData.length > 0) {
-      newsData = await Promise.all(
+      translatedData = await Promise.all(
         newsData.map(async (item) => {
           const title = item.title || "";
           const text = item.text || "";
@@ -393,14 +322,21 @@ const getCurrencyPairNewsInclude = async (req, res) => {
       );
     }
 
+    const responseData = {
+      ...response.data,
+      data: translatedData
+    };
+
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(responseData));
+
     res.json({
       success: true,
       message: "Currency pair (include) news fetched successfully",
-      data: newsData,
+      data: responseData,
     });
-
   } catch (error) {
-    console.error("Error fetching Currency Pair (Include) news:", error.message);
+    console.error("Error fetching currency pair (include) news:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch currency pair (include) news",
@@ -408,6 +344,7 @@ const getCurrencyPairNewsInclude = async (req, res) => {
     });
   }
 };
+
 
 const getCurrencyPairNewsOnly = async (req, res) => {
   try {
@@ -418,19 +355,15 @@ const getCurrencyPairNewsOnly = async (req, res) => {
     // Create cache key
     const cacheKey = `currencyPairNewsOnly:${currencypairOnly}:${items}:${page}`;
     
-    // try {
-    //   // Try to get from cache first
-    //   const cachedData = await redisClient.get(cacheKey);
-    //   if (cachedData) {
-    //     return res.json({
-    //       success: true,
-    //       message: "Currency pair (only) news fetched successfully (cache)",
-    //       data: JSON.parse(cachedData)
-    //     });
-    //   }
-    // } catch (redisError) {
-    //   // Silently continue to API call if Redis fails
-    // }
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "Currency pair (only) news fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
@@ -438,14 +371,8 @@ const getCurrencyPairNewsOnly = async (req, res) => {
 
     const response = await axios.get(url);
 
-    await trackApiCall('getCurrencyPairNewsOnly');
-
-    // try {
-    //   // Try to save to Redis cache
-    //   await redisClient.setEx(cacheKey, 300, JSON.stringify(response.data));
-    // } catch (redisError) {
-    //   // Silently continue if Redis save fails
-    // }
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(response.data));
 
     res.json({
       success: true,
@@ -469,19 +396,15 @@ const getGeneralForexNews = async (req, res) => {
     // Create cache key
     const cacheKey = `generalForexNews:${items}:${page}`;
     
-    // try {
-    //   // Try to get from cache first
-    //   const cachedData = await redisClient.get(cacheKey);
-    //   if (cachedData) {
-    //     return res.json({
-    //       success: true,
-    //       message: "General Forex news fetched successfully (cache)",
-    //       data: JSON.parse(cachedData)
-    //     });
-    //   }
-    // } catch (redisError) {
-    //   // Silently continue to API call if Redis fails
-    // }
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "General Forex news fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
@@ -489,14 +412,8 @@ const getGeneralForexNews = async (req, res) => {
 
     const response = await axios.get(url);
 
-    await trackApiCall('getGeneralForexNews');
-
-    // try {
-    //   // Try to save to Redis cache
-    //   await redisClient.setEx(cacheKey, 300, JSON.stringify(response.data));
-    // } catch (redisError) {
-    //   // Silently continue if Redis save fails
-    // }
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(response.data));
 
     res.json({
       success: true,
@@ -517,19 +434,15 @@ const getTickersDB = async (req, res) => {
     // Create cache key
     const cacheKey = 'tickersDB';
     
-    // try {
-    //   // Try to get from cache first
-    //   const cachedData = await redisClient.get(cacheKey);
-    //   if (cachedData) {
-    //     return res.json({
-    //       success: true,
-    //       message: "Tickers DB fetched successfully (cache)",
-    //       data: JSON.parse(cachedData)
-    //     });
-    //   }
-    // } catch (redisError) {
-    //   // Silently continue to API call if Redis fails
-    // }
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "Tickers DB fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
@@ -537,14 +450,8 @@ const getTickersDB = async (req, res) => {
 
     const response = await axios.get(url);
 
-    await trackApiCall('getTickersDB');
-
-    // try {
-    //   // Try to save to Redis cache
-    //   await redisClient.setEx(cacheKey, 300, JSON.stringify(response.data));
-    // } catch (redisError) {
-    //   // Silently continue if Redis save fails
-    // }
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(response.data));
 
     res.json({
       success: true,
@@ -565,14 +472,28 @@ const getAllCurrencyPairsNews = async (req, res) => {
     const items = req.query.items || 50;
     const page = req.query.page || 1;
 
+    // Create cache key
+    const cacheKey = `allCurrencyPairsNews:${items}:${page}`;
+    
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "All Currency Pairs news fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
+
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
     const url = `${FOREX_API_BASE_URL}/category?section=allcurrencypairs&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
 
-    await trackApiCall('getAllCurrencyPairsNews');
-    
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(response.data));
+
     res.json({
       success: true,
       message: "All Currency Pairs news fetched successfully",
@@ -595,19 +516,15 @@ const getTopMentionedCurrencyPairs = async (req, res) => {
     // Create cache key
     const cacheKey = `topMentionedCurrencyPairs:${date}:${cache}`;
     
-    // try {
-    //   // Try to get from cache first
-    //   const cachedData = await redisClient.get(cacheKey);
-    //   if (cachedData) {
-    //     return res.json({
-    //       success: true,
-    //       message: "Top Mentioned Currency Pairs fetched successfully (cache)",
-    //       data: JSON.parse(cachedData)
-    //     });
-    //   }
-    // } catch (redisError) {
-    //   // Silently continue to API call if Redis fails
-    // }
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "Top Mentioned Currency Pairs fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
@@ -615,14 +532,8 @@ const getTopMentionedCurrencyPairs = async (req, res) => {
 
     const response = await axios.get(url);
 
-    await trackApiCall('getTopMentionedCurrencyPairs');
-
-    // try {
-    //   // Try to save to Redis cache
-    //   await redisClient.setEx(cacheKey, 300, JSON.stringify(response.data));
-    // } catch (redisError) {
-    //   // Silently continue if Redis save fails
-    // }
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(response.data));
 
     res.json({
       success: true,
@@ -669,81 +580,40 @@ const getTopMentionedCurrencyPairs = async (req, res) => {
 //   }
 // };
 
-// const getSentimentAnalysis = async (req, res) => {
-//   try {
-//     const currencypair = req.query.currencypair || "EUR-USD";
-//     const date = req.query.date || "last30days";
-//     const page = Number(req.query.page) || 1;
-//     const lang = req.query.lang || "en"; // 👈 added language param
-
-//     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
-
-//     const url =
-//       `${FOREX_API_BASE_URL}/stat` +
-//       `?currencypair=${encodeURIComponent(currencypair)}` +
-//       `&date=${encodeURIComponent(date)}` +
-//       `&page=${page}` +
-//       `&token=${encodeURIComponent(FOREX_API_token_BASE_URL)}`;
-
-//     const response = await axios.get(url);
-
-//     await trackApiCall('getSentimentAnalysis');
-
-//     const payload = response.data || {};
-
-//     const totals = Object.entries(payload.total || {}).map(
-//       ([pair, totalsObj]) => ({
-//         pair,
-//         ...(totalsObj || {}),
-//       })
-//     );
-
-//     const rows = Object.entries(payload.data || {}).flatMap(
-//       ([dateKey, pairObj]) =>
-//         Object.entries(pairObj || {}).map(([pair, metrics]) => ({
-//           date: dateKey,
-//           pair,
-//           ...(metrics || {}),
-//         }))
-//     );
-
-//     return res.json({
-//       success: true,
-//       message: `Sentiment Analysis fetched successfully (${lang})`, // 👈 optional trace
-//       total_pages: payload.total_pages ?? null,
-//       totals,
-//       data: rows,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching Sentiment Analysis:", error?.message);
-//     const status = error?.response?.status || 500;
-//     return res.status(status).json({
-//       success: false,
-//       error: error?.message || "Unknown error",
-//       details: error?.response?.data ?? null,
-//     });
-//   }
-// };
-
 const getSentimentAnalysis = async (req, res) => {
   try {
-    const lang = req.query.lang || "en";
+    const currencypair = req.query.currencypair || "EUR-USD";
+    const date = req.query.date || "last30days";
+    const page = Number(req.query.page) || 1;
+    const lang = req.query.lang || "en"; // 👈 added language param
 
-    const latestRow = await getSentimentAnalysiss.findOne();
-    // payload may be stored as JSON string in DB
-    const normalizeApiResponse = (resp) => {
-      if (!resp) return resp;
-      if (typeof resp === 'string') {
-        try {
-          return JSON.parse(resp);
-        } catch (err) {
-          try { return JSON.parse(resp.replace(/^[\uFEFF\u200B]+/, '')); } catch (e) { return resp; }
-        }
-      }
-      return resp;
-    };
+    // Create cache key
+    const cacheKey = `sentimentAnalysis:${currencypair}:${date}:${page}:${lang}`;
+    
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      const parsedData = JSON.parse(cachedData);
+      return res.json({
+        success: true,
+        message: `Sentiment Analysis fetched from cache (${lang})`,
+        total_pages: parsedData.total_pages,
+        totals: parsedData.totals,
+        data: parsedData.data
+      });
+    }
 
-    const payload = latestRow ? normalizeApiResponse(latestRow.api_response) : {};
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+
+    const url =
+      `${FOREX_API_BASE_URL}/stat` +
+      `?currencypair=${encodeURIComponent(currencypair)}` +
+      `&date=${encodeURIComponent(date)}` +
+      `&page=${page}` +
+      `&token=${encodeURIComponent(FOREX_API_token_BASE_URL)}`;
+
+    const response = await axios.get(url);
+    const payload = response.data || {};
 
     const totals = Object.entries(payload.total || {}).map(
       ([pair, totalsObj]) => ({
@@ -761,17 +631,17 @@ const getSentimentAnalysis = async (req, res) => {
         }))
     );
 
-    res.json({
+    return res.json({
       success: true,
-      message: `Sentiment Analysis fetched successfully (${lang})`,
+      message: `Sentiment Analysis fetched successfully (${lang})`, // 👈 optional trace
       total_pages: payload.total_pages ?? null,
       totals,
       data: rows,
     });
-
   } catch (error) {
     console.error("Error fetching Sentiment Analysis:", error?.message);
-    res.status(500).json({
+    const status = error?.response?.status || 500;
+    return res.status(status).json({
       success: false,
       error: error?.message || "Unknown error",
       details: error?.response?.data ?? null,
@@ -789,19 +659,15 @@ const getAllCurrencyPairsSentiment = async (req, res) => {
     // Create cache key
     const cacheKey = `allCurrencyPairsSentiment:${date}:${page}`;
     
-    // try {
-    //   // Try to get from cache first
-    //   const cachedData = await redisClient.get(cacheKey);
-    //   if (cachedData) {
-    //     return res.json({
-    //       success: true,
-    //       message: "All Currency Pairs Sentiment Analysis fetched successfully (cache)",
-    //       data: JSON.parse(cachedData)
-    //     });
-    //   }
-    // } catch (redisError) {
-    //   // Silently continue to API call if Redis fails
-    // }
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "All Currency Pairs Sentiment Analysis fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
@@ -809,14 +675,8 @@ const getAllCurrencyPairsSentiment = async (req, res) => {
 
     const response = await axios.get(url);
 
-    await trackApiCall('getAllCurrencyPairsSentiment');
-
-    // try {
-    //   // Try to save to Redis cache
-    //   await redisClient.setEx(cacheKey, 300, JSON.stringify(response.data));
-    // } catch (redisError) {
-    //   // Silently continue if Redis save fails
-    // }
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(response.data));
 
     res.json({
       success: true,
@@ -845,19 +705,15 @@ const getGeneralSentiment = async (req, res) => {
     // Create cache key
     const cacheKey = `generalSentiment:${date}:${page}:${cache}`;
     
-    // try {
-    //   // Try to get from cache first
-    //   const cachedData = await redisClient.get(cacheKey);
-    //   if (cachedData) {
-    //     return res.json({
-    //       success: true,
-    //       message: "General Forex News Sentiment Analysis fetched successfully (cache)",
-    //       data: JSON.parse(cachedData)
-    //     });
-    //   }
-    // } catch (redisError) {
-    //   // Silently continue to API call if Redis fails
-    // }
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "General Forex News Sentiment Analysis fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
@@ -865,14 +721,8 @@ const getGeneralSentiment = async (req, res) => {
 
     const response = await axios.get(url);
 
-    await trackApiCall('getGeneralSentiment');
-
-    // try {
-    //   // Try to save to Redis cache
-    //   await redisClient.setEx(cacheKey, 300, JSON.stringify(response.data));
-    // } catch (redisError) {
-    //   // Silently continue if Redis save fails
-    // }
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(response.data));
 
     res.json({
       success: true,
@@ -893,53 +743,66 @@ const getGeneralSentiment = async (req, res) => {
 
 const getAllEvents = async (req, res) => {
   try {
-    const lang = req.query.lang || "en";
+    const page = req.params.page || 1;
+    const cache = req.query.cache || true;
+    const lang = req.query.lang || "en"; // language param
 
-    const latestRow = await getAllEventss.findOne();
-    const normalizeApiResponse = (resp) => {
-      if (!resp) return resp;
-      if (typeof resp === 'string') {
-        try {
-          return JSON.parse(resp);
-        } catch (err) {
-          try { return JSON.parse(resp.replace(/^[\uFEFF\u200B]+/, '')); } catch (e) { return resp; }
-        }
-      }
-      return resp;
-    };
-
-    let apiData = latestRow ? normalizeApiResponse(latestRow.api_response) : {};
-
-    if (lang !== "en" && apiData.data && Array.isArray(apiData.data)) {
-      const translatedEvents = await Promise.all(
-        apiData.data.map(async (item) => {
-          const name = item.event_name || "";
-          const text = item.event_text || "";
-
-          const [tName, tText] = await Promise.all([
-            name ? translateText(name, lang) : name,
-            text ? translateText(text, lang) : text,
-          ]);
-
-          return {
-            ...item,
-            event_name: tName,
-            event_text: tText,
-          };
-        })
-      );
-
-      apiData.data = translatedEvents;
+    // Create cache key
+    const cacheKey = `allEvents:${page}:${cache}:${lang}`;
+    
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: `Events fetched from cache (${lang})`,
+        data: JSON.parse(cachedData)
+      });
     }
 
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+    const url = `${FOREX_API_BASE_URL}/events?page=${page}&cache=${cache}&token=${FOREX_API_token_BASE_URL}`;
+
+    const response = await axios.get(url);
+
+    let apiData = response.data;
+
+    // ✅ agar andar array hai to usko nikal ke translate karenge
+    if (apiData && apiData.data && Array.isArray(apiData.data)) {
+      if (lang !== "en") {
+        const translatedEvents = await Promise.all(
+          apiData.data.map(async (item) => {
+            const name = item.event_name || "";
+            const text = item.event_text || "";
+
+            const [tName, tText] = await Promise.all([
+              name ? translateText(name, lang) : name,
+              text ? translateText(text, lang) : text,
+            ]);
+
+            return {
+              ...item,
+              event_name: tName,
+              event_text: tText,
+            };
+          })
+        );
+
+        apiData.data = translatedEvents; // 👈 translation replace kar do
+      }
+    }
+
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(apiData));
+
+    // ✅ return structure same rahe
     res.json({
       success: true,
       message: `Events fetched successfully (${lang})`,
       data: apiData,
     });
-
   } catch (error) {
-    console.error("Error fetching Events:", error.message);
+    console.error("Error fetching events:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -967,9 +830,6 @@ const getEventById = async (req, res) => {
     const url = `${FOREX_API_BASE_URL}/events?eventid=${eventid}&page=${page}&cache=${cache}&token=${FOREX_API_token_BASE_URL}`;
 
     const response = await axios.get(url);
-
-    await trackApiCall('getEventById');
-
     let apiData = response.data;
 
     // ✅ agar language English nahi hai to translation karni hai
@@ -1055,99 +915,41 @@ const getEventById = async (req, res) => {
 
 
 
-// const getTrendingHeadlines = async (req, res) => {
-//   try {
-//     const page = req.query.page || 1;
-//     const lang = req.query.lang || "en";
-
-//     // Create cache key
-//     const cacheKey = `trendingHeadlines:${page}:${lang}`;
-
-//     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
-
-//     const url = `${FOREX_API_BASE_URL}/trending-headlines?page=${page}&token=${FOREX_API_token_BASE_URL}`;
-//     const response = await axios.get(url);
-
-//     await trackApiCall('getTrendingHeadlines');
-
-//     let data = response.data;
-
-//     // normalize structure (agar data array me ho)
-//     if (data && data.data && Array.isArray(data.data)) {
-//       data = data.data;
-//     } else if (Array.isArray(data)) {
-//       data = data;
-//     } else {
-//       data = [];
-//     }
-
-//     // 🔹 agar language English nahi hai to translate karo
-//     if (lang !== "en" && Array.isArray(data)) {
-//       const translatedData = await Promise.all(
-//         data.map(async (item) => {
-//           const title = item.headline || "";
-//           const description = item.description || "";
-//           const text = item.text || "";
-
-//           const [tTitle, tDescription, tText] = await Promise.all([
-//             title ? translateText(title, lang) : title,
-//             description ? translateText(description, lang) : description,
-//             text ? translateText(text, lang) : text,
-//           ]);
-
-//           return {
-//             ...item,
-//             headline: tTitle,
-//             description: tDescription,
-//             text: tText,
-//           };
-//         })
-//       );
-
-//       data = translatedData;
-//     }
-
-//     // try {
-//     //   // Try to save to Redis cache
-//     //   await redisClient.setEx(cacheKey, 300, JSON.stringify(data));
-//     // } catch (redisError) {
-//     //   // Silently continue if Redis save fails
-//     // }
-
-//     res.json({
-//       success: true,
-//       message: "Trending headlines fetched successfully",
-//       data,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching trending headlines:", error.message);
-//     res.status(500).json({
-//       success: false,
-//       error: error.message,
-//     });
-//   }
-// };
-
 const getTrendingHeadlines = async (req, res) => {
   try {
+    const page = req.query.page || 1;
     const lang = req.query.lang || "en";
 
-    let latestRow = await getTrendingHeadliness.findOne();
-    const normalizeApiResponse = (resp) => {
-      if (!resp) return resp;
-      if (typeof resp === 'string') {
-        try {
-          return JSON.parse(resp);
-        } catch (err) {
-          try { return JSON.parse(resp.replace(/^[\uFEFF\u200B]+/, '')); } catch (e) { return resp; }
-        }
-      }
-      return resp;
-    };
+    // Create cache key
+    const cacheKey = `trendingHeadlines:${page}:${lang}`;
+    
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "Trending headlines fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
-    let data = latestRow ? normalizeApiResponse(latestRow.api_response) : [];
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
-    // Translate if language is not English
+    const url = `${FOREX_API_BASE_URL}/trending-headlines?page=${page}&token=${FOREX_API_token_BASE_URL}`;
+    const response = await axios.get(url);
+
+    let data = response.data;
+
+    // normalize structure (agar data array me ho)
+    if (data && data.data && Array.isArray(data.data)) {
+      data = data.data;
+    } else if (Array.isArray(data)) {
+      data = data;
+    } else {
+      data = [];
+    }
+
+    // 🔹 agar language English nahi hai to translate karo
     if (lang !== "en" && Array.isArray(data)) {
       const translatedData = await Promise.all(
         data.map(async (item) => {
@@ -1173,14 +975,16 @@ const getTrendingHeadlines = async (req, res) => {
       data = translatedData;
     }
 
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(data));
+
     res.json({
       success: true,
       message: "Trending headlines fetched successfully",
       data,
     });
-
   } catch (error) {
-    console.error("Error fetching Trending Headlines:", error.message);
+    console.error("Error fetching trending headlines:", error.message);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -1202,178 +1006,42 @@ const getTrendingHeadlines = async (req, res) => {
 
 
 
-// const getSundownDigest = async (req, res) => {
-//   try {
-//     const page = req.query.page || 1;
-//     const lang = req.query.lang || "en"; // translation ke liye add kiya
-
-//     // Create cache key
-//     const cacheKey = `sundownDigest:${page}:${lang}`;
-    
-//     // try {
-//     //   // Try to get from cache first
-//     //   const cachedData = await redisClient.get(cacheKey);
-//     //   if (cachedData) {
-//     //     return res.json({
-//     //       success: true,
-//     //       message: "Sundown Digest fetched successfully cache (cache)",
-//     //       data: JSON.parse(cachedData)
-//     //     });
-//     //   }
-//     // } catch (redisError) {
-//     //   // Silently continue to API call if Redis fails
-//     // }
-
-//     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
-//     const url = `${FOREX_API_BASE_URL}/sundown-digest?page=${page}&token=${FOREX_API_token_BASE_URL}`;
-
-//     const response = await axios.get(url);
-
-//     await trackApiCall('getSundownDigest');
-
-//     let data = response.data;
-
-//     // normalize array
-//     if (data && data.data && Array.isArray(data.data)) {
-//       data = data.data;
-//     } else if (Array.isArray(data)) {
-//       data = data;
-//     } else {
-//       data = [];
-//     }
-
-//     // translate if language is not English
-//     if (lang !== "en" && Array.isArray(data)) {
-//       const translatedData = await Promise.all(
-//         data.map(async (item) => {
-//           const title = item.title || "";
-//           const description = item.description || "";
-//           const text = item.text || "";
-//           const headline = item.headline || "";
-
-//           const [tHeadline, tTitle, tDescription, tText] = await Promise.all([
-//             headline ? translateText(headline, lang) : headline,
-//             title ? translateText(title, lang) : title,
-//             description ? translateText(description, lang) : description,
-//             text ? translateText(text, lang) : text,
-//           ]);
-
-//           return {
-//             ...item,
-//             headline: tHeadline,
-//             title: tTitle,
-//             description: tDescription,
-//             text: tText,
-//           };
-//         })
-//       );
-
-
-//       data = translatedData;
-//     }
-
-//     // try {
-//     //   // Try to save to Redis cache
-//     //   await redisClient.setEx(cacheKey, 300, JSON.stringify(data));
-//     // } catch (redisError) {
-//     //   // Silently continue if Redis save fails
-//     // }
-
-//     res.json({
-//       success: true,
-//       message: "Sundown Digest fetched successfully",
-//       data,
-//     });
-//   } catch (error) {
-//     console.error("Error fetching Sundown Digest:", error.message);
-//     res.status(500).json({
-//       success: false,
-//       error: error.message,
-//     });
-//   }
-// };
-
-
-// const getCategory = async (req, res) => {
-//   try {
-//     const section = req.query.section || "general";
-//     const items = req.query.items || 10;
-//     const page = req.query.page || 1;
-//     const lang = req.query.lang || "en";
-
-//     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
-
-//     const url = `${FOREX_API_BASE_URL}/category?section=${section}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
-//     const response = await axios.get(url);
-
-//     await trackApiCall('getCategory');
-
-//     let data = response.data;
-
-//     if (data && data.data && Array.isArray(data.data)) {
-//       data = data.data;
-//     } else if (Array.isArray(data)) {
-//       data = data;
-//     } else {
-//       data = [];
-//     }
-
-//     if (lang !== "en" && Array.isArray(data)) {
-//       const translatedData = await Promise.all(
-//         data.map(async (item) => {
-//           const title = item.title || "";
-//           const description = item.description || "";
-//           const text = item.text || "";
-
-//           const [tTitle, tDescription, tText] = await Promise.all([
-//             title ? translateText(title, lang) : title,
-//             description ? translateText(description, lang) : description,
-//             text ? translateText(text, lang) : text,
-//           ]);
-
-//           return {
-//             ...item,
-//             title: tTitle,
-//             description: tDescription,
-//             text: tText,
-//           };
-//         })
-//       );
-
-//       data = translatedData;
-//     }
-
-//     res.json({
-//       success: true,
-//       message: `Category (${section}) news fetched successfully`,
-//       data,
-//     });
-
-//   } catch (error) {
-//     console.error("Error fetching category news:", error.message);
-//     res.status(500).json({
-//       success: false,
-//       error: error.message,
-//     });
-//   }
-// };
 
 const getSundownDigest = async (req, res) => {
   try {
-    const lang = req.query.lang || "en";
+    const page = req.query.page || 1;
+    const lang = req.query.lang || "en"; // translation ke liye add kiya
 
-    let latestRow = await getSundownDigestt.findOne({ order: [['createdAt', 'DESC']] });
-    const normalizeApiResponse = (resp) => {
-      if (!resp) return resp;
-      if (typeof resp === 'string') {
-        try { return JSON.parse(resp); } catch (err) { try { return JSON.parse(resp.replace(/^[\uFEFF\u200B]+/, '')); } catch (e) { return resp; } }
-      }
-      return resp;
-    };
+    // Create cache key
+    const cacheKey = `sundownDigest:${page}:${lang}`;
+    
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "Sundown Digest fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
-    let data = latestRow ? normalizeApiResponse(latestRow.api_response) : [];
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
+    const url = `${FOREX_API_BASE_URL}/sundown-digest?page=${page}&token=${FOREX_API_token_BASE_URL}`;
 
-    // translate if not English
+    const response = await axios.get(url);
+
+    let data = response.data;
+
+    // normalize array
+    if (data && data.data && Array.isArray(data.data)) {
+      data = data.data;
+    } else if (Array.isArray(data)) {
+      data = data;
+    } else {
+      data = [];
+    }
+
+    // translate if language is not English
     if (lang !== "en" && Array.isArray(data)) {
       const translatedData = await Promise.all(
         data.map(async (item) => {
@@ -1399,15 +1067,18 @@ const getSundownDigest = async (req, res) => {
         })
       );
 
+
       data = translatedData;
     }
+
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(data));
 
     res.json({
       success: true,
       message: "Sundown Digest fetched successfully",
       data,
     });
-
   } catch (error) {
     console.error("Error fetching Sundown Digest:", error.message);
     res.status(500).json({
@@ -1417,24 +1088,46 @@ const getSundownDigest = async (req, res) => {
   }
 };
 
+
 const getCategory = async (req, res) => {
   try {
     const section = req.query.section || "general";
+    const items = req.query.items || 10;
+    const page = req.query.page || 1;
     const lang = req.query.lang || "en";
 
-    // DB se latest row fetch karo
-    let latestDataRow = await getGeneralForexNewss.findOne({ order: [['createdAt', 'DESC']] });
-    const normalizeApiResponse = (resp) => {
-      if (!resp) return resp;
-      if (typeof resp === 'string') {
-        try { return JSON.parse(resp); } catch (err) { try { return JSON.parse(resp.replace(/^[\uFEFF\u200B]+/, '')); } catch (e) { return resp; } }
-      }
-      return resp;
-    };
+    const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
 
-    let data = latestDataRow ? normalizeApiResponse(latestDataRow.api_response) : [];
+    // ✅ cache key unique for section+page+lang
+    const cacheKey = `category:${section}:page${page}:items${items}:lang${lang}`;
 
-    // Agar language English nahi hai to translate
+    // 1️⃣ Redis check
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      console.log("Returning cached category data");
+      return res.json({
+        success: true,
+        message: `Category (${section}) news fetched successfully (from cache)`,
+        data: JSON.parse(cachedData),
+      });
+    }
+
+    // 2️⃣ Fetch new data from API
+    const url = `${FOREX_API_BASE_URL}/category?section=${section}&items=${items}&page=${page}&token=${FOREX_API_token_BASE_URL}`;
+    const response = await axios.get(url);
+
+    let data = response.data;
+
+    // normalize array
+    if (data && data.data && Array.isArray(data.data)) {
+      data = data.data;
+    } else if (Array.isArray(data)) {
+      data = data;
+    } else {
+      data = [];
+    }
+
+    // translate if lang !== "en"
     if (lang !== "en" && Array.isArray(data)) {
       const translatedData = await Promise.all(
         data.map(async (item) => {
@@ -1460,9 +1153,12 @@ const getCategory = async (req, res) => {
       data = translatedData;
     }
 
+    // 3️⃣ Save to Redis with 150 sec expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(data));
+
     res.json({
       success: true,
-      message: `Category (${section}) news fetched successfully`,
+      message: `Category (${section}) news fetched successfully (from API)`,
       data,
     });
 
@@ -1484,26 +1180,19 @@ const getNewsById = async (req, res) => {
     // Create cache key
     const cacheKey = `newsById:${id}:${page}:${lang}`;
     
-    // try {
-    //   // Try to get from cache first
-    //   const cachedData = await redisClient.get(cacheKey);
-    //   if (cachedData) {
-    //     return res.json({
-    //       success: true,
-    //       message: "News fetched successfully (cache)",
-    //       data: JSON.parse(cachedData)
-    //     });
-    //   }
-    // } catch (redisError) {
-    //   // Silently continue to API call if Redis fails
-    // }
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "News fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
 
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
     const url = `${FOREX_API_BASE_URL}/trending-headlines?page=${page}&token=${FOREX_API_token_BASE_URL}`;
     const response = await axios.get(url);
-
-    await trackApiCall('getNewsById');
-    
     const data = response?.data?.data;
 
     const newsItem = data?.find((item) => item.id === Number(id));
@@ -1535,12 +1224,8 @@ const getNewsById = async (req, res) => {
       };
     }
 
-    // try {
-    //   // Try to save to Redis cache
-    //   await redisClient.setEx(cacheKey, 300, JSON.stringify(translatedItem));
-    // } catch (redisError) {
-    //   // Silently continue if Redis save fails
-    // }
+    // Save to Redis with 150 seconds expiry
+    await redisClient.setEx(cacheKey, 150, JSON.stringify(translatedItem));
 
     res.status(200).json({
       success: true,
@@ -1560,16 +1245,28 @@ const getAllTrendingHeadlines = async (req, res) => {
     const page = req.query.page || 1;
     const lang = req.query.lang || "en"; // 🔹 language param
 
+    // Create cache key
+    const cacheKey = `allTrendingHeadlines:${page}:${lang}`;
+    
+    // Check cache first
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.json({
+        success: true,
+        message: "All trending headlines fetched from cache",
+        data: JSON.parse(cachedData)
+      });
+    }
+
     const { FOREX_API_BASE_URL, FOREX_API_token_BASE_URL } = apiConfig;
     const url = `${FOREX_API_BASE_URL}/trending-headlines?page=${page}&token=${FOREX_API_token_BASE_URL}`;
     const response = await axios.get(url);
-
-    await trackApiCall('getAllTrendingHeadlines');
 
     const newsData = response?.data?.data || [];
 
     let translatedData = newsData;
 
+    // 🔹 Only translate if lang ≠ "en"
     if (lang !== "en" && newsData.length > 0) {
       translatedData = await Promise.all(
         newsData.map(async (item) => {
@@ -1706,61 +1403,6 @@ const getNegativeSentimentAndNotify = async (req, res) => {
   }
 };
 
-const getCategoryAllCurrencyPairs = async (req, res) => {
-  try {
-    const lang = req.query.lang || "en";
-
-    const latestRow = await getCategoryAllCurrencyPairss.findOne();
-    const normalizeApiResponse = (resp) => {
-      if (!resp) return resp;
-      if (typeof resp === 'string') {
-        try { return JSON.parse(resp); } catch (err) { try { return JSON.parse(resp.replace(/^[\uFEFF\u200B]+/, '')); } catch (e) { return resp; } }
-      }
-      return resp;
-    };
-
-    let data = latestRow ? normalizeApiResponse(latestRow.api_response) : [];
-
-    if (lang !== "en" && Array.isArray(data)) {
-      const translatedData = await Promise.all(
-        data.map(async (item) => {
-          const title = item.title || "";
-          const description = item.description || "";
-          const text = item.text || "";
-
-          const [tTitle, tDescription, tText] = await Promise.all([
-            title ? translateText(title, lang) : title,
-            description ? translateText(description, lang) : description,
-            text ? translateText(text, lang) : text,
-          ]);
-
-          return {
-            ...item,
-            title: tTitle,
-            description: tDescription,
-            text: tText,
-          };
-        })
-      );
-
-      data = translatedData;
-    }
-
-    res.json({
-      success: true,
-      message: "All Currency Pairs fetched successfully",
-      data,
-    });
-
-  } catch (error) {
-    console.error("Error fetching All Currency Pairs:", error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
-
 
 export {
   getCurrencyPairNews,
@@ -1782,6 +1424,4 @@ export {
   getNewsById,
   getAllTrendingHeadlines,
   getNegativeSentimentAndNotify,
-  getCategoryAllCurrencyPairs,
-  // initRedis
 };

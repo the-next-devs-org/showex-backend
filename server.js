@@ -2,6 +2,14 @@ require("dotenv").config();
 const express = require("express");
 const sequelize = require("./config/db");
 
+require('./cron/updateForexNews.js');
+require('./cron/updateSundownDigest.js');
+require('./cron/updateTrendingHeadlines.js');
+require('./cron/updateCurrencyPairNewsInclude.js');
+require('./cron/updateSentimentAnalysis.js');
+require('./cron/updateAllEvents.js');
+require('./cron/updateCategoryAllCurrencyPairs.js');
+
 const registerRoute = require("./routes/registerRoute");
 const currencyRoutes = require("./routes/currencyRoutes");
 const fredRoutes = require("./routes/fredCategoriesRoutes");
@@ -12,6 +20,7 @@ const fredTagsRoutes = require("./routes/fredTagsRoutes");
 const predictionRoutes = require("./routes/predictionRoutes");
 const indicatorRoutes = require('./routes/indicatorRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const ipDateRoutes = require('./routes/ipDateRoutes');
 
 const cron = require('node-cron');
 const { getNegativeSentimentAndNotify } = require('./controllers/currencyController');
@@ -43,31 +52,32 @@ app.use("/api", currencyRoutes);
 app.use("/api/predictions", predictionRoutes);
 app.use('/api/indicators', indicatorRoutes);
 app.use('/api/notications', notificationRoutes);
+app.use('/api/ipdate', ipDateRoutes);
 
 
 app.get("/", (req, res) => res.send("API is running"));
 
 const PORT = process.env.PORT;
 
-cron.schedule('*/15 * * * *', async () => {
-  console.log('Cron job running at', new Date());
-  try {
-    // Pass empty objects as req and res since it's not a real HTTP request
-    await getNegativeSentimentAndNotify({
-      query: {
-        section: "allcurrencypairs",
-        items: 50,
-        page: 1
-      }
-    }, {
-      json: () => {},
-      status: () => ({ json: () => {} })
-    });
-    console.log('✅ getNegativeSentimentAndNotify executed successfully');
-  } catch (err) {
-    console.error('❌ Error executing function:', err.message);
-  }
-});
+// cron.schedule('*/15 * * * *', async () => {
+//   console.log('Cron job running at', new Date());
+//   try {
+//     // Pass empty objects as req and res since it's not a real HTTP request
+//     await getNegativeSentimentAndNotify({
+//       query: {
+//         section: "allcurrencypairs",
+//         items: 50,
+//         page: 1
+//       }
+//     }, {
+//       json: () => {},
+//       status: () => ({ json: () => {} })
+//     });
+//     console.log('✅ getNegativeSentimentAndNotify executed successfully');
+//   } catch (err) {
+//     console.error('❌ Error executing function:', err.message);
+//   }
+// });
 
 (async () => {
   try {

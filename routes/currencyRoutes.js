@@ -20,7 +20,8 @@ const {
     getCategory,
     getNewsById,
     getAllTrendingHeadlines,
-    getNegativeSentimentAndNotify
+    getNegativeSentimentAndNotify,
+    getCategoryAllCurrencyPairs
     
 } = require("../controllers/currencyController");
 
@@ -40,6 +41,7 @@ router.get("/eventById/:eventid", getEventById);
 router.get("/trendingHeadlines", getTrendingHeadlines);
 router.get("/sundownDigest", getSundownDigest);
 router.get("/category", getCategory);
+router.get("/categoryallpairscurreny", getCategoryAllCurrencyPairs);
 router.get("/trending-headlines/:id", getNewsById);
 router.get("/trending-headlines", getAllTrendingHeadlines);
 router.get("/getNegativeSentimentAndNotify", getNegativeSentimentAndNotify);
